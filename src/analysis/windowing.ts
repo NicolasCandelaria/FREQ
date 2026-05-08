@@ -9,6 +9,10 @@ export function aggregateWindows(
   durationSec: number,
   windowSec = 30
 ): TimelineWindow[] {
+  if (windowSec <= 0) {
+    throw new Error("windowSec must be greater than 0");
+  }
+
   const safeDurationSec = Math.max(0, durationSec);
   const totalWindows = Math.ceil(safeDurationSec / windowSec);
   const energySumByWindow = new Array<number>(totalWindows).fill(0);
