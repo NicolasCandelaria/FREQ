@@ -61,10 +61,64 @@ describe("renderTimeline", () => {
 
     renderTimeline(canvas, windows);
 
-    expect(fillRect).toHaveBeenCalledTimes(3);
+    // Background + per-window key band + uncertainty overlays (confidence < 1)
+    expect(fillRect).toHaveBeenCalledTimes(5);
     expect(beginPath).toHaveBeenCalledTimes(3);
     expect(fill).toHaveBeenCalledTimes(1);
     expect(stroke).toHaveBeenCalledTimes(2);
+  });
+
+  it("draws hover highlight and crosshair when hoverIndex is set", () => {
+    const fillRect = vi.fn();
+    const beginPath = vi.fn();
+    const stroke = vi.fn();
+
+    const mockContext = {
+      fillStyle: "#000000",
+      strokeStyle: "#000000",
+      lineWidth: 1,
+      beginPath,
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+      fill: vi.fn(),
+      stroke,
+      fillRect
+    } as unknown as CanvasRenderingContext2D;
+
+    const canvas = {
+      width: 600,
+      height: 240,
+      getContext: vi.fn().mockReturnValue(mockContext)
+    } as unknown as HTMLCanvasElement;
+
+    const windows: TimelineWindow[] = [
+      {
+        startSec: 0,
+        endSec: 30,
+        energyRms: 0.2,
+        bpm: 120,
+        bpmConfidence: 0.8,
+        key: "Am",
+        keyConfidence: 0.6
+      },
+      {
+        startSec: 30,
+        endSec: 60,
+        energyRms: 0.7,
+        bpm: 128,
+        bpmConfidence: 0.7,
+        key: "C",
+        keyConfidence: 0.9
+      }
+    ];
+
+    renderTimeline(canvas, windows, { hoverIndex: 0 });
+
+    // +1 hover overlay on first window, +1 crosshair stroke path
+    expect(fillRect).toHaveBeenCalledTimes(6);
+    expect(beginPath).toHaveBeenCalledTimes(4);
+    expect(stroke).toHaveBeenCalledTimes(3);
   });
 
   it("uses stable band color for the same key", () => {
@@ -103,7 +157,8 @@ describe("renderTimeline", () => {
 
     renderTimeline(canvas, windows);
 
-    expect(fillStyles[1]).toBe(fillStyles[2]);
+    // Index 1 and 3 are key-band fills; 2 and 4 are uncertainty overlays
+    expect(fillStyles[1]).toBe(fillStyles[3]);
   });
 
   it("uses distinct hues for different keys", () => {
@@ -140,6 +195,6 @@ describe("renderTimeline", () => {
 
     renderTimeline(canvas, windows);
 
-    expect(fillStyles[1]).not.toBe(fillStyles[2]);
+    expect(fillStyles[1]).not.toBe(fillStyles[3]);
   });
 });
