@@ -4,6 +4,16 @@ export function estimateBpmFromOnsets(
   onsetTimesSec: number[],
   opts: { minBpm: number; maxBpm: number }
 ): BpmEstimate {
+  if (opts.minBpm <= 0) {
+    throw new Error("minBpm must be greater than 0");
+  }
+  if (opts.maxBpm <= 0) {
+    throw new Error("maxBpm must be greater than 0");
+  }
+  if (opts.minBpm > opts.maxBpm) {
+    throw new Error("minBpm must be less than or equal to maxBpm");
+  }
+
   if (onsetTimesSec.length < 3) {
     return { bpm: null, confidence: 0 };
   }
