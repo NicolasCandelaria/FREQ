@@ -133,6 +133,42 @@ describe("App upload flow", () => {
     expect(container.textContent).toContain("1 windows analyzed");
   });
 
+  it("shows error state when analysis returns zero windows", async () => {
+    mocks.decodeToMonoMock.mockResolvedValue({
+      samples: new Float32Array([0.1, 0.2, 0.3]),
+      sampleRate: 44_100,
+      durationSec: 1
+    });
+    mocks.runAnalysisPipelineMock.mockResolvedValue([]);
+
+    container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<App />);
+    });
+
+    const input = container.querySelector("input[type='file']") as HTMLInputElement;
+    const file = new File(["fake"], "demo.mp3", { type: "audio/mpeg" });
+
+    await act(async () => {
+      Object.defineProperty(input, "files", {
+        configurable: true,
+        value: [file]
+      });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Status: Unable to process audio");
+    expect(container.textContent).toContain(
+      "Analysis finished but produced no timeline windows for this track. It may be too short or unreadable."
+    );
+    expect(container.textContent).toContain("Select audio file to analyze timeline");
+  });
+
   it("shows error state for unsupported file types", async () => {
     container = document.createElement("div");
     document.body.append(container);

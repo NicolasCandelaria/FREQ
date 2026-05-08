@@ -109,6 +109,17 @@ export default function App() {
       if (activeRequestRef.current !== requestId) {
         return;
       }
+      if (analyzedWindows.length === 0) {
+        setHoverIndex(null);
+        setHoverX(0);
+        setTimelineCanvasWidth(1);
+        setWindows([]);
+        setStatus("error");
+        setErrorMessage(
+          "Analysis finished but produced no timeline windows for this track. It may be too short or unreadable."
+        );
+        return;
+      }
       setWindows(analyzedWindows);
       setHoverIndex(null);
       setHoverX(0);
