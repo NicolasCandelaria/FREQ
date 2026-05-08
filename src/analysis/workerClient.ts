@@ -6,6 +6,17 @@ import type { AnalysisFrame, TimelineWindow } from "../types/timeline";
 
 const BPM_CONFIDENCE_THRESHOLD = 0.35;
 const KEY_CONFIDENCE_THRESHOLD = 0.55;
+let requestCounter = 0;
+
+export type AnalysisWorkerRequest = {
+  requestId: string;
+  samples: Float32Array;
+  sampleRate: number;
+};
+
+export type AnalysisWorkerResponse =
+  | { type: "done"; requestId: string; windows: TimelineWindow[] }
+  | { type: "error"; requestId: string; message: string };
 
 function getFramesForWindow(
   frames: readonly AnalysisFrame[],
@@ -45,7 +56,7 @@ function sumWindowChroma(frames: readonly AnalysisFrame[]): number[] {
   return chroma;
 }
 
-export async function runAnalysisPipeline(
+export async function runAnalysisPipelineDirect(
   samples: Float32Array,
   sampleRate: number
 ): Promise<TimelineWindow[]> {
@@ -72,3 +83,49 @@ export async function runAnalysisPipeline(
 
   return windows;
 }
+
+function nextRequestId(): string {
+  requestCounter += 1;
+  return `req-${requestCounter}`;
+}
+
+export async function runAnalysisPipelineInWorker(
+  samples: Float32Array,
+  sampleRate: number
+): Promise<TimelineWindow[]> {
+  const requestId = nextRequestId();
+  const worker = new Worker(new URL("./worker.ts", import.meta.url), {
+    type: "module"
+  });
+
+  return new Promise<TimelineWindow[]>((resolve, reject) => {
+    worker.onmessage = (event: MessageEvent<AnalysisWorkerResponse>): void => {
+      const response = event.data;
+      if (response.requestId !== requestId) {
+        return;
+      }
+
+      worker.terminate();
+      if (response.type === "done") {
+        resolve(response.windows);
+        return;
+      }
+
+      reject(new Error(response.message));
+    };
+
+    worker.onerror = (): void => {
+      worker.terminate();
+      reject(new Error("Analysis worker failed"));
+    };
+
+    worker.postMessage({
+      requestId,
+      samples,
+      sampleRate
+    } satisfies AnalysisWorkerRequest);
+  });
+}
+
+// Default app-facing API should remain worker-backed.
+export const runAnalysisPipeline = runAnalysisPipelineInWorker;
