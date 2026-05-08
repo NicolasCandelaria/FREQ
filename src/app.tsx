@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { runAnalysisPipeline } from "./analysis/workerClient";
 import { decodeToMono } from "./audio/decode";
+import { renderTimeline } from "./render/timelineCanvas";
 import type { TimelineWindow } from "./types/timeline";
 
 type UploadStatus = "idle" | "decoding" | "analyzing" | "rendered" | "error";
@@ -49,6 +50,14 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [windows, setWindows] = useState<TimelineWindow[]>([]);
   const activeRequestRef = useRef(0);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) {
+      return;
+    }
+    renderTimeline(canvasRef.current, windows);
+  }, [windows]);
 
   async function handleFile(file: File): Promise<void> {
     const requestId = activeRequestRef.current + 1;
@@ -111,7 +120,10 @@ export default function App() {
         {windows.length === 0 ? (
           <p>Drop audio file to analyze timeline</p>
         ) : (
-          <p>{windows.length} windows analyzed</p>
+          <>
+            <p>{windows.length} windows analyzed</p>
+            <canvas ref={canvasRef} width={1200} height={420} />
+          </>
         )}
       </section>
     </main>
