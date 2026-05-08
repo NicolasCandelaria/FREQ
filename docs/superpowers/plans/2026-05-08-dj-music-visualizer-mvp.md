@@ -52,16 +52,16 @@
 import { describe, expect, it } from "vitest";
 
 describe("startup", () => {
-  it("has test runner configured", () => {
-    expect(import.meta.vitest).toBeDefined();
+  it("runs tests in a browser-like environment", () => {
+    expect(globalThis.window).toBeDefined();
   });
 });
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm test -- src/main-startup.test.ts`  
-Expected: FAIL with missing Vitest config or missing dependencies.
+Run: `npm test -- --environment node src/main-startup.test.ts`  
+Expected: FAIL because `window` is undefined in `node` environment.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -101,7 +101,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: "node"
+    environment: "jsdom"
   }
 });
 ```
