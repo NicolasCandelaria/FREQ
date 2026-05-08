@@ -111,3 +111,7 @@ export function estimateKeyFromChroma(chroma: number[]): KeyEstimate {
 
   return { key: bestLabel, confidence };
 }
+
+export function estimateKey(chroma: number[]): KeyEstimate {
+  return estimateKeyFromChroma(chroma);
+}
