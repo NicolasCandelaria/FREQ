@@ -32,6 +32,17 @@ const analyzedWindows: TimelineWindow[] = [
   }
 ];
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve, reject };
+}
+
 describe("App upload flow", () => {
   let container: HTMLDivElement | null = null;
 
@@ -42,13 +53,16 @@ describe("App upload flow", () => {
     mocks.runAnalysisPipelineMock.mockReset();
   });
 
-  it("shows upload CTA and transitions decode -> analyze -> rendered", async () => {
-    mocks.decodeToMonoMock.mockResolvedValue({
-      samples: new Float32Array([0.1, 0.2, 0.3]),
-      sampleRate: 44_100,
-      durationSec: 1
-    });
-    mocks.runAnalysisPipelineMock.mockResolvedValue(analyzedWindows);
+  it("shows upload CTA and transitions decoding -> analyzing -> rendered", async () => {
+    const decodeGate = deferred<{
+      samples: Float32Array;
+      sampleRate: number;
+      durationSec: number;
+    }>();
+    const analyzeGate = deferred<TimelineWindow[]>();
+
+    mocks.decodeToMonoMock.mockReturnValue(decodeGate.promise);
+    mocks.runAnalysisPipelineMock.mockReturnValue(analyzeGate.promise);
 
     container = document.createElement("div");
     document.body.append(container);
@@ -73,8 +87,113 @@ describe("App upload flow", () => {
       await Promise.resolve();
     });
 
+    expect(container.textContent).toContain("Status: Decoding audio file...");
+
+    await act(async () => {
+      decodeGate.resolve({
+        samples: new Float32Array([0.1, 0.2, 0.3]),
+        sampleRate: 44_100,
+        durationSec: 1
+      });
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Status: Analyzing track in worker...");
+
+    await act(async () => {
+      analyzeGate.resolve(analyzedWindows);
+      await Promise.resolve();
+    });
+
     expect(mocks.decodeToMonoMock).toHaveBeenCalledWith(file);
     expect(mocks.runAnalysisPipelineMock).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("Status: Analysis complete");
+    expect(container.textContent).toContain("1 windows analyzed");
+  });
+
+  it("shows error state when decoding fails", async () => {
+    mocks.decodeToMonoMock.mockRejectedValue(new Error("decode failed"));
+
+    container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<App />);
+    });
+
+    const input = container.querySelector("input[type='file']") as HTMLInputElement;
+    const file = new File(["fake"], "demo.mp3", { type: "audio/mpeg" });
+
+    await act(async () => {
+      Object.defineProperty(input, "files", {
+        configurable: true,
+        value: [file]
+      });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Status: Unable to process audio");
+    expect(container.textContent).toContain(
+      "We could not decode or analyze that track. Please try another file."
+    );
+  });
+
+  it("keeps latest upload result when earlier request resolves last", async () => {
+    const firstAnalyze = deferred<TimelineWindow[]>();
+    const secondAnalyze = deferred<TimelineWindow[]>();
+
+    mocks.decodeToMonoMock
+      .mockResolvedValueOnce({
+        samples: new Float32Array([0.1, 0.1, 0.1]),
+        sampleRate: 44_100,
+        durationSec: 1
+      })
+      .mockResolvedValueOnce({
+        samples: new Float32Array([0.2, 0.2, 0.2]),
+        sampleRate: 44_100,
+        durationSec: 1
+      });
+    mocks.runAnalysisPipelineMock
+      .mockReturnValueOnce(firstAnalyze.promise)
+      .mockReturnValueOnce(secondAnalyze.promise);
+
+    container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(<App />);
+    });
+
+    const input = container.querySelector("input[type='file']") as HTMLInputElement;
+    const firstFile = new File(["one"], "first.mp3", { type: "audio/mpeg" });
+    const secondFile = new File(["two"], "second.mp3", { type: "audio/mpeg" });
+
+    await act(async () => {
+      Object.defineProperty(input, "files", { configurable: true, value: [firstFile] });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      Object.defineProperty(input, "files", { configurable: true, value: [secondFile] });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      secondAnalyze.resolve(analyzedWindows);
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain("Status: Analysis complete");
+    expect(container.textContent).toContain("1 windows analyzed");
+
+    await act(async () => {
+      firstAnalyze.resolve([]);
+      await Promise.resolve();
+    });
+
     expect(container.textContent).toContain("Status: Analysis complete");
     expect(container.textContent).toContain("1 windows analyzed");
   });
