@@ -1,86 +1,69 @@
 import { describe, expect, it } from "vitest";
-import type { TimelineFrameSample } from "../../types/timeline";
-import { aggregateTimelineWindows } from "../windowing";
+import type { AnalysisFrame } from "../../types/timeline";
+import { aggregateWindows } from "../windowing";
 
-describe("aggregateTimelineWindows", () => {
-  it("aggregates frame samples into 30-second windows", () => {
-    const frames: TimelineFrameSample[] = [
+describe("aggregateWindows", () => {
+  it("aggregates rms frames using default 30-second windows", () => {
+    const frames: AnalysisFrame[] = [
       {
         timeSec: 3,
-        energyRms: 0.2,
-        bpm: 120,
-        bpmConfidence: 0.8,
-        key: "Am",
-        keyConfidence: 0.9
+        rms: 0.2,
+        chroma: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
       },
       {
         timeSec: 12,
-        energyRms: 0.4,
-        bpm: 122,
-        bpmConfidence: 0.7,
-        key: "Am",
-        keyConfidence: 0.7
+        rms: 0.4,
+        chroma: [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
       },
       {
         timeSec: 35,
-        energyRms: 0.8,
-        bpm: 128,
-        bpmConfidence: 0.95,
-        key: "C",
-        keyConfidence: 0.8
+        rms: 0.8,
+        chroma: [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
       }
     ];
 
-    const windows = aggregateTimelineWindows(frames);
+    const windows = aggregateWindows(frames, 60);
 
     expect(windows).toHaveLength(2);
     expect(windows[0]).toMatchObject({
       startSec: 0,
       endSec: 30,
-      bpm: 121,
-      bpmConfidence: 0.75,
-      key: "Am",
-      keyConfidence: 1
+      bpm: null,
+      bpmConfidence: 0,
+      key: null,
+      keyConfidence: 0
     });
     expect(windows[0].energyRms).toBeCloseTo(0.3);
     expect(windows[1]).toMatchObject({
       startSec: 30,
       endSec: 60,
       energyRms: 0.8,
-      bpm: 128,
-      bpmConfidence: 0.95,
-      key: "C",
-      keyConfidence: 1
+      bpm: null,
+      bpmConfidence: 0,
+      key: null,
+      keyConfidence: 0
     });
   });
 
-  it("nulls uncertain bpm and key values", () => {
-    const frames: TimelineFrameSample[] = [
+  it("creates full duration-driven windows including empty buckets", () => {
+    const frames: AnalysisFrame[] = [
       {
         timeSec: 5,
-        energyRms: 0.1,
-        bpm: 110,
-        bpmConfidence: 0.35,
-        key: "Dm",
-        keyConfidence: 0.45
+        rms: 0.1,
+        chroma: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
       },
       {
-        timeSec: 20,
-        energyRms: 0.3,
-        bpm: 112,
-        bpmConfidence: 0.25,
-        key: "F",
-        keyConfidence: 0.35
+        timeSec: 65,
+        rms: 0.7,
+        chroma: [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
       }
     ];
 
-    const windows = aggregateTimelineWindows(frames);
+    const windows = aggregateWindows(frames, 70);
 
-    expect(windows).toHaveLength(1);
-    expect(windows[0].energyRms).toBe(0.2);
-    expect(windows[0].bpm).toBeNull();
-    expect(windows[0].bpmConfidence).toBe(0.3);
-    expect(windows[0].key).toBeNull();
-    expect(windows[0].keyConfidence).toBe(0.5);
+    expect(windows).toHaveLength(3);
+    expect(windows[0]).toMatchObject({ startSec: 0, endSec: 30, energyRms: 0.1 });
+    expect(windows[1]).toMatchObject({ startSec: 30, endSec: 60, energyRms: 0 });
+    expect(windows[2]).toMatchObject({ startSec: 60, endSec: 90, energyRms: 0.7 });
   });
 });

@@ -1,107 +1,41 @@
-import type {
-  TimelineFrameSample,
-  TimelineWindow,
-  WindowAggregationOptions
-} from "../types/timeline";
-
-const DEFAULT_WINDOW_SIZE_SEC = 30;
-const DEFAULT_MIN_BPM_CONFIDENCE = 0.6;
-const DEFAULT_MIN_KEY_CONFIDENCE = 0.6;
-
-interface MutableWindowStats {
-  index: number;
-  energySum: number;
-  bpmSum: number;
-  bpmConfidenceSum: number;
-  bpmCount: number;
-  keyVotes: Map<string, number>;
-  keyCount: number;
-  sampleCount: number;
-}
+import type { AnalysisFrame, TimelineWindow } from "../types/timeline";
 
 function average(sum: number, count: number): number {
   return count === 0 ? 0 : sum / count;
 }
 
-export function aggregateTimelineWindows(
-  frames: readonly TimelineFrameSample[],
-  options: WindowAggregationOptions = {}
+export function aggregateWindows(
+  frames: readonly AnalysisFrame[],
+  durationSec: number,
+  windowSec = 30
 ): TimelineWindow[] {
-  if (frames.length === 0) {
-    return [];
-  }
-
-  const windowSizeSec = options.windowSizeSec ?? DEFAULT_WINDOW_SIZE_SEC;
-  const minBpmConfidence =
-    options.minBpmConfidence ?? DEFAULT_MIN_BPM_CONFIDENCE;
-  const minKeyConfidence =
-    options.minKeyConfidence ?? DEFAULT_MIN_KEY_CONFIDENCE;
-
-  const statsByWindow = new Map<number, MutableWindowStats>();
+  const safeDurationSec = Math.max(0, durationSec);
+  const totalWindows = Math.ceil(safeDurationSec / windowSec);
+  const energySumByWindow = new Array<number>(totalWindows).fill(0);
+  const frameCountByWindow = new Array<number>(totalWindows).fill(0);
 
   for (const frame of frames) {
-    const index = Math.floor(frame.timeSec / windowSizeSec);
-    const stats = statsByWindow.get(index) ?? {
-      index,
-      energySum: 0,
-      bpmSum: 0,
-      bpmConfidenceSum: 0,
-      bpmCount: 0,
-      keyVotes: new Map<string, number>(),
-      keyCount: 0,
-      sampleCount: 0
-    };
-
-    stats.energySum += frame.energyRms;
-    stats.sampleCount += 1;
-
-    if (frame.bpm !== null) {
-      stats.bpmSum += frame.bpm;
-      stats.bpmConfidenceSum += frame.bpmConfidence;
-      stats.bpmCount += 1;
+    const index = Math.floor(frame.timeSec / windowSec);
+    if (index < 0 || index >= totalWindows) {
+      continue;
     }
-
-    if (frame.key !== null) {
-      const existingVotes = stats.keyVotes.get(frame.key) ?? 0;
-      stats.keyVotes.set(frame.key, existingVotes + 1);
-      stats.keyCount += 1;
-    }
-
-    statsByWindow.set(index, stats);
+    energySumByWindow[index] += frame.rms;
+    frameCountByWindow[index] += 1;
   }
 
-  const sortedStats = [...statsByWindow.values()].sort(
-    (left, right) => left.index - right.index
-  );
-
-  return sortedStats.map((stats) => {
-    const startSec = stats.index * windowSizeSec;
-    const endSec = startSec + windowSizeSec;
-    const energyRms = average(stats.energySum, stats.sampleCount);
-    const bpmConfidence = average(stats.bpmConfidenceSum, stats.bpmCount);
-    const bpmAverage = average(stats.bpmSum, stats.bpmCount);
-    const bpm = bpmConfidence >= minBpmConfidence ? bpmAverage : null;
-
-    let topKey: string | null = null;
-    let topVotes = 0;
-    for (const [key, votes] of stats.keyVotes.entries()) {
-      if (votes > topVotes) {
-        topKey = key;
-        topVotes = votes;
-      }
-    }
-
-    const keyConfidence = average(topVotes, stats.keyCount);
-    const key = keyConfidence >= minKeyConfidence ? topKey : null;
-
-    return {
+  const windows: TimelineWindow[] = [];
+  for (let index = 0; index < totalWindows; index += 1) {
+    const startSec = index * windowSec;
+    windows.push({
       startSec,
-      endSec,
-      energyRms,
-      bpm,
-      bpmConfidence,
-      key,
-      keyConfidence
-    };
-  });
+      endSec: startSec + windowSec,
+      energyRms: average(energySumByWindow[index], frameCountByWindow[index]),
+      bpm: null,
+      bpmConfidence: 0,
+      key: null,
+      keyConfidence: 0
+    });
+  }
+
+  return windows;
 }
