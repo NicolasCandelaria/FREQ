@@ -50,6 +50,7 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [windows, setWindows] = useState<TimelineWindow[]>([]);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [hoverX, setHoverX] = useState(0);
   const activeRequestRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -69,6 +70,7 @@ export default function App() {
         return;
       }
       setHoverIndex(null);
+      setHoverX(0);
       setWindows([]);
       setStatus("error");
       setErrorMessage("Please upload one .mp3, .wav, or .m4a file.");
@@ -77,6 +79,7 @@ export default function App() {
 
     setWindows([]);
     setHoverIndex(null);
+    setHoverX(0);
     setErrorMessage(null);
     setStatus("decoding");
 
@@ -91,12 +94,15 @@ export default function App() {
         return;
       }
       setWindows(analyzedWindows);
+      setHoverIndex(null);
+      setHoverX(0);
       setStatus("rendered");
     } catch (_error) {
       if (activeRequestRef.current !== requestId) {
         return;
       }
       setHoverIndex(null);
+      setHoverX(0);
       setWindows([]);
       setStatus("error");
       setErrorMessage("We could not decode or analyze that track. Please try another file.");
@@ -105,11 +111,7 @@ export default function App() {
 
   const hoveredWindow =
     hoverIndex !== null && windows[hoverIndex] ? windows[hoverIndex] : null;
-
-  const bpmConfidenceClass =
-    hoveredWindow && hoveredWindow.bpmConfidence < 0.5 ? "low-confidence" : "high-confidence";
-  const keyConfidenceClass =
-    hoveredWindow && hoveredWindow.keyConfidence < 0.5 ? "low-confidence" : "high-confidence";
+  const tooltipLeftPercent = (hoverX / 1200) * 100;
 
   return (
     <main className="app">
@@ -139,31 +141,58 @@ export default function App() {
               width={1200}
               height={420}
               onMouseMove={(event) => {
-                const rect = event.currentTarget.getBoundingClientRect();
-                const x = event.clientX - rect.left;
-                setHoverIndex(getWindowIndexAtX(x, event.currentTarget.width, windows.length));
+                const canvas = event.currentTarget;
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const x = (event.clientX - rect.left) * scaleX;
+                setHoverX(Math.max(0, Math.min(canvas.width, x)));
+                setHoverIndex(getWindowIndexAtX(x, canvas.width, windows.length));
               }}
               onMouseLeave={() => {
                 setHoverIndex(null);
               }}
             />
             {hoveredWindow ? (
-              <div className="timeline-tooltip" role="status" aria-live="polite">
-                <p>
-                  <strong>Window:</strong> {hoveredWindow.startSec.toFixed(0)}s -{" "}
-                  {hoveredWindow.endSec.toFixed(0)}s
+              <div
+                className="timeline-tooltip"
+                role="status"
+                aria-live="polite"
+                style={{ left: `${tooltipLeftPercent}%` }}
+              >
+                <p className="timeline-tooltip__range">
+                  {hoveredWindow.startSec.toFixed(0)}s - {hoveredWindow.endSec.toFixed(0)}s
                 </p>
                 <p>
-                  <strong>Energy:</strong> {hoveredWindow.energyRms.toFixed(3)}
+                  <strong>Energy:</strong> {hoveredWindow.energyRms.toFixed(2)}
                 </p>
-                <p className={bpmConfidenceClass}>
+                <p>
                   <strong>BPM:</strong>{" "}
-                  {hoveredWindow.bpm === null ? "N/A" : hoveredWindow.bpm.toFixed(1)} (
-                  {(hoveredWindow.bpmConfidence * 100).toFixed(0)}% confidence)
+                  {hoveredWindow.bpm === null ? "Unknown" : hoveredWindow.bpm.toFixed(0)}
+                  <span
+                    className={`confidence-pill ${
+                      hoveredWindow.bpmConfidence >= 0.75
+                        ? "confidence-pill--high"
+                        : hoveredWindow.bpmConfidence >= 0.45
+                          ? "confidence-pill--medium"
+                          : "confidence-pill--low"
+                    }`}
+                  >
+                    {Math.round(hoveredWindow.bpmConfidence * 100)}%
+                  </span>
                 </p>
-                <p className={keyConfidenceClass}>
-                  <strong>Key:</strong> {hoveredWindow.key ?? "Unknown"} (
-                  {(hoveredWindow.keyConfidence * 100).toFixed(0)}% confidence)
+                <p>
+                  <strong>Key:</strong> {hoveredWindow.key ?? "Unknown"}
+                  <span
+                    className={`confidence-pill ${
+                      hoveredWindow.keyConfidence >= 0.75
+                        ? "confidence-pill--high"
+                        : hoveredWindow.keyConfidence >= 0.45
+                          ? "confidence-pill--medium"
+                          : "confidence-pill--low"
+                    }`}
+                  >
+                    {Math.round(hoveredWindow.keyConfidence * 100)}%
+                  </span>
                 </p>
               </div>
             ) : (
