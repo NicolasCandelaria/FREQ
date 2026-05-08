@@ -94,7 +94,7 @@ describe("App upload flow", () => {
       root.render(<App />);
     });
 
-    expect(container.textContent).toContain("Drop audio file to analyze timeline");
+    expect(container.textContent).toContain("Select audio file to analyze timeline");
     expect(container.textContent).toContain("Status: Ready for upload");
 
     const input = container.querySelector("input[type='file']") as HTMLInputElement;
@@ -131,6 +131,33 @@ describe("App upload flow", () => {
     expect(mocks.runAnalysisPipelineMock).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain("Status: Analysis complete");
     expect(container.textContent).toContain("1 windows analyzed");
+  });
+
+  it("shows error state for unsupported file types", async () => {
+    container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<App />);
+    });
+
+    const input = container.querySelector("input[type='file']") as HTMLInputElement;
+    const file = new File(["x"], "readme.txt", { type: "text/plain" });
+
+    await act(async () => {
+      Object.defineProperty(input, "files", {
+        configurable: true,
+        value: [file]
+      });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Status: Unable to process audio");
+    expect(container.textContent).toContain("Please upload one .mp3, .wav, or .m4a file.");
+    expect(mocks.decodeToMonoMock).not.toHaveBeenCalled();
+    expect(mocks.runAnalysisPipelineMock).not.toHaveBeenCalled();
   });
 
   it("shows error state when decoding fails", async () => {

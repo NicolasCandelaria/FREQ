@@ -150,7 +150,7 @@ export default function App() {
         />
         {errorMessage ? <p role="alert">{errorMessage}</p> : null}
         {windows.length === 0 ? (
-          <p>Drop audio file to analyze timeline</p>
+          <p>Select audio file to analyze timeline</p>
         ) : (
           <div className="timeline-shell">
             <p>{windows.length} windows analyzed</p>
