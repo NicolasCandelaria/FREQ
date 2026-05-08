@@ -4,7 +4,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import App from "./app";
 import type { TimelineWindow } from "./types/timeline";
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
 
 const mocks = vi.hoisted(() => ({
   decodeToMonoMock: vi.fn(),
@@ -27,8 +28,7 @@ const analyzedWindows: TimelineWindow[] = [
     bpm: 124,
     bpmConfidence: 0.81,
     key: "Am",
-    keyConfidence: 0.67,
-    chroma: new Array<number>(12).fill(0)
+    keyConfidence: 0.67
   }
 ];
 
