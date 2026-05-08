@@ -56,6 +56,8 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [windows, setWindows] = useState<TimelineWindow[]>([]);
   const [playbackBuffer, setPlaybackBuffer] = useState<AudioBuffer | null>(null);
+  /** Shown next to the file control; native input is cleared after pick so the browser cannot keep the name visible. */
+  const [chosenFileLabel, setChosenFileLabel] = useState("No file chosen");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [hoverX, setHoverX] = useState(0);
   /** Canvas bitmap width matching element width; avoids magic numbers for tooltip positioning */
@@ -155,17 +157,26 @@ export default function App() {
         <h1>DJ Music Visualizer</h1>
         <p>Status: {getStatusMessage(status)}</p>
         <p>Supported format: one file (.mp3, .wav, .m4a)</p>
-        <input
-          type="file"
-          accept={[...SUPPORTED_EXTENSIONS, ...SUPPORTED_MIME_TYPES].join(",")}
-          onChange={(event) => {
-            const selectedFile = event.currentTarget.files?.[0];
-            if (selectedFile) {
-              void handleFile(selectedFile);
-            }
-            event.currentTarget.value = "";
-          }}
-        />
+        <div className="file-input-row">
+          <input
+            id="audio-file-input"
+            type="file"
+            className="file-input-row__input"
+            accept={[...SUPPORTED_EXTENSIONS, ...SUPPORTED_MIME_TYPES].join(",")}
+            aria-describedby="chosen-file-label"
+            onChange={(event) => {
+              const selectedFile = event.currentTarget.files?.[0];
+              if (selectedFile) {
+                setChosenFileLabel(selectedFile.name);
+                void handleFile(selectedFile);
+              }
+              event.currentTarget.value = "";
+            }}
+          />
+          <span id="chosen-file-label" className="file-input-row__chosen" aria-live="polite">
+            {chosenFileLabel}
+          </span>
+        </div>
         {errorMessage ? <p role="alert">{errorMessage}</p> : null}
         {windows.length === 0 ? (
           <p>Select audio file to analyze timeline</p>

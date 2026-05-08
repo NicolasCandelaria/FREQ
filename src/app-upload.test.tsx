@@ -100,6 +100,7 @@ describe("App upload flow", () => {
 
     expect(container.textContent).toContain("Select audio file to analyze timeline");
     expect(container.textContent).toContain("Status: Ready for upload");
+    expect(container.textContent).toContain("No file chosen");
 
     const input = container.querySelector("input[type='file']") as HTMLInputElement;
     const file = new File(["fake"], "demo.mp3", { type: "audio/mpeg" });
@@ -113,6 +114,7 @@ describe("App upload flow", () => {
       await Promise.resolve();
     });
 
+    expect(container.textContent).toContain("demo.mp3");
     expect(container.textContent).toContain("Status: Decoding audio file...");
 
     await act(async () => {
