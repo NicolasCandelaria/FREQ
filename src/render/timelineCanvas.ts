@@ -14,9 +14,20 @@ function mapBpmToY(bpm: number, top: number, bottom: number): number {
   return bottom - (bottom - top) * normalized;
 }
 
-function getKeyBandColor(windowIndex: number, keyConfidence: number): string {
+function mapKeyToHue(key: string | null): number {
+  if (!key) {
+    return 0;
+  }
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  return hash % 360;
+}
+
+function getKeyBandColor(key: string | null, keyConfidence: number): string {
   const alpha = 0.18 + Math.max(0, Math.min(1, keyConfidence)) * 0.35;
-  const hue = (windowIndex * 31) % 360;
+  const hue = mapKeyToHue(key);
   return `hsla(${hue}, 70%, 40%, ${alpha})`;
 }
 
@@ -43,7 +54,7 @@ export function renderTimeline(canvas: HTMLCanvasElement, windows: TimelineWindo
   const bandWidth = width / windows.length;
   windows.forEach((window, index) => {
     const x = index * bandWidth;
-    ctx.fillStyle = getKeyBandColor(index, window.keyConfidence);
+    ctx.fillStyle = getKeyBandColor(window.key, window.keyConfidence);
     ctx.fillRect(x, 0, bandWidth, height);
   });
 

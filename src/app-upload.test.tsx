@@ -1,6 +1,6 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import App from "./app";
 import type { TimelineWindow } from "./types/timeline";
 
@@ -45,12 +45,34 @@ function deferred<T>() {
 
 describe("App upload flow", () => {
   let container: HTMLDivElement | null = null;
+  let originalGetContext: typeof HTMLCanvasElement.prototype.getContext;
+
+  beforeAll(() => {
+    originalGetContext = HTMLCanvasElement.prototype.getContext;
+    const stubContext = {
+      fillStyle: "#000000",
+      strokeStyle: "#000000",
+      lineWidth: 1,
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      fillRect: vi.fn()
+    } as unknown as CanvasRenderingContext2D;
+    HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(stubContext);
+  });
 
   afterEach(() => {
     container?.remove();
     container = null;
     mocks.decodeToMonoMock.mockReset();
     mocks.runAnalysisPipelineMock.mockReset();
+  });
+
+  afterAll(() => {
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
   });
 
   it("shows upload CTA and transitions decoding -> analyzing -> rendered", async () => {

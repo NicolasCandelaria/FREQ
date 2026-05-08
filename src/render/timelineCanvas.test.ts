@@ -66,4 +66,80 @@ describe("renderTimeline", () => {
     expect(fill).toHaveBeenCalledTimes(1);
     expect(stroke).toHaveBeenCalledTimes(2);
   });
+
+  it("uses stable band color for the same key", () => {
+    const fillRect = vi.fn();
+    const fillStyles: string[] = [];
+    let currentFillStyle = "#000000";
+    const mockContext = {
+      strokeStyle: "#000000",
+      lineWidth: 1,
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      fillRect: (...args: Parameters<typeof fillRect>) => {
+        fillStyles.push(currentFillStyle);
+        fillRect(...args);
+      },
+      set fillStyle(value: string) {
+        currentFillStyle = value;
+      },
+      get fillStyle() {
+        return currentFillStyle;
+      }
+    } as unknown as CanvasRenderingContext2D;
+    const canvas = {
+      width: 600,
+      height: 240,
+      getContext: vi.fn().mockReturnValue(mockContext)
+    } as unknown as HTMLCanvasElement;
+    const windows: TimelineWindow[] = [
+      { startSec: 0, endSec: 30, energyRms: 0.2, bpm: 120, bpmConfidence: 0.8, key: "Am", keyConfidence: 0.6 },
+      { startSec: 30, endSec: 60, energyRms: 0.3, bpm: 122, bpmConfidence: 0.8, key: "Am", keyConfidence: 0.6 }
+    ];
+
+    renderTimeline(canvas, windows);
+
+    expect(fillStyles[1]).toBe(fillStyles[2]);
+  });
+
+  it("uses distinct hues for different keys", () => {
+    const fillStyles: string[] = [];
+    let currentFillStyle = "#000000";
+    const mockContext = {
+      strokeStyle: "#000000",
+      lineWidth: 1,
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      fillRect: () => {
+        fillStyles.push(currentFillStyle);
+      },
+      set fillStyle(value: string) {
+        currentFillStyle = value;
+      },
+      get fillStyle() {
+        return currentFillStyle;
+      }
+    } as unknown as CanvasRenderingContext2D;
+    const canvas = {
+      width: 600,
+      height: 240,
+      getContext: vi.fn().mockReturnValue(mockContext)
+    } as unknown as HTMLCanvasElement;
+    const windows: TimelineWindow[] = [
+      { startSec: 0, endSec: 30, energyRms: 0.2, bpm: 120, bpmConfidence: 0.8, key: "Am", keyConfidence: 0.6 },
+      { startSec: 30, endSec: 60, energyRms: 0.3, bpm: 122, bpmConfidence: 0.8, key: "C", keyConfidence: 0.6 }
+    ];
+
+    renderTimeline(canvas, windows);
+
+    expect(fillStyles[1]).not.toBe(fillStyles[2]);
+  });
 });
