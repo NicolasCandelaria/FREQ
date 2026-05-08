@@ -14,6 +14,8 @@ Visual-only, client-side timeline analyzer for one track at a time.
 
 The app decodes one supported audio file in the browser, analyzes it in a worker, and renders an interactive timeline for inspection. Hovering the timeline surfaces window-level metrics and confidence values.
 
+After analysis completes, use **Play** under **Live spectrum** to hear the track and watch **radial frequency bars** bounce around a circle (Web Audio `AnalyserNode`, synced to playback).
+
 ## What Is Out of Scope (v1)
 
 - Multi-file or playlist analysis

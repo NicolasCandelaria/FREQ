@@ -2,6 +2,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import App from "./app";
+import { createFakeAudioBuffer } from "./test/fakeAudioBuffer";
 import type { TimelineWindow } from "./types/timeline";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -53,10 +54,12 @@ describe("App upload flow", () => {
       fillStyle: "#000000",
       strokeStyle: "#000000",
       lineWidth: 1,
+      lineCap: "round",
       beginPath: vi.fn(),
       moveTo: vi.fn(),
       lineTo: vi.fn(),
       closePath: vi.fn(),
+      arc: vi.fn(),
       fill: vi.fn(),
       stroke: vi.fn(),
       fillRect: vi.fn()
@@ -80,6 +83,7 @@ describe("App upload flow", () => {
       samples: Float32Array;
       sampleRate: number;
       durationSec: number;
+      audioBuffer: AudioBuffer;
     }>();
     const analyzeGate = deferred<TimelineWindow[]>();
 
@@ -115,7 +119,8 @@ describe("App upload flow", () => {
       decodeGate.resolve({
         samples: new Float32Array([0.1, 0.2, 0.3]),
         sampleRate: 44_100,
-        durationSec: 1
+        durationSec: 1,
+        audioBuffer: createFakeAudioBuffer()
       });
       await Promise.resolve();
     });
@@ -137,7 +142,8 @@ describe("App upload flow", () => {
     mocks.decodeToMonoMock.mockResolvedValue({
       samples: new Float32Array([0.1, 0.2, 0.3]),
       sampleRate: 44_100,
-      durationSec: 1
+      durationSec: 1,
+      audioBuffer: createFakeAudioBuffer()
     });
     mocks.runAnalysisPipelineMock.mockResolvedValue([]);
 
@@ -233,12 +239,14 @@ describe("App upload flow", () => {
       .mockResolvedValueOnce({
         samples: new Float32Array([0.1, 0.1, 0.1]),
         sampleRate: 44_100,
-        durationSec: 1
+        durationSec: 1,
+        audioBuffer: createFakeAudioBuffer()
       })
       .mockResolvedValueOnce({
         samples: new Float32Array([0.2, 0.2, 0.2]),
         sampleRate: 44_100,
-        durationSec: 1
+        durationSec: 1,
+        audioBuffer: createFakeAudioBuffer()
       });
     mocks.runAnalysisPipelineMock
       .mockReturnValueOnce(firstAnalyze.promise)

@@ -2,6 +2,8 @@ export type DecodedAudio = {
   samples: Float32Array;
   sampleRate: number;
   durationSec: number;
+  /** Original decoded buffer for playback (multi-channel). Safe to use after `AudioContext` closes. */
+  audioBuffer: AudioBuffer;
 };
 
 export async function decodeToMono(file: File): Promise<DecodedAudio> {
@@ -22,7 +24,8 @@ export async function decodeToMono(file: File): Promise<DecodedAudio> {
     return {
       samples: monoSamples,
       sampleRate: buffer.sampleRate,
-      durationSec: buffer.duration
+      durationSec: buffer.duration,
+      audioBuffer: buffer
     };
   } finally {
     await audioContext.close();

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { runAnalysisPipeline } from "./analysis/workerClient";
 import { decodeToMono } from "./audio/decode";
+import { CircularPlayback } from "./components/CircularPlayback";
 import { confidencePillModifiers } from "./render/confidenceTier";
 import { getWindowIndexAtX, renderTimeline } from "./render/timelineCanvas";
 import type { TimelineWindow } from "./types/timeline";
@@ -54,6 +55,7 @@ export default function App() {
   const [status, setStatus] = useState<UploadStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [windows, setWindows] = useState<TimelineWindow[]>([]);
+  const [playbackBuffer, setPlaybackBuffer] = useState<AudioBuffer | null>(null);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [hoverX, setHoverX] = useState(0);
   /** Canvas bitmap width matching element width; avoids magic numbers for tooltip positioning */
@@ -87,12 +89,14 @@ export default function App() {
       setHoverX(0);
       setTimelineCanvasWidth(1);
       setWindows([]);
+      setPlaybackBuffer(null);
       setStatus("error");
       setErrorMessage("Please upload one .mp3, .wav, or .m4a file.");
       return;
     }
 
     setWindows([]);
+    setPlaybackBuffer(null);
     setHoverIndex(null);
     setHoverX(0);
     setTimelineCanvasWidth(1);
@@ -114,12 +118,14 @@ export default function App() {
         setHoverX(0);
         setTimelineCanvasWidth(1);
         setWindows([]);
+        setPlaybackBuffer(null);
         setStatus("error");
         setErrorMessage(
           "Analysis finished but produced no timeline windows for this track. It may be too short or unreadable."
         );
         return;
       }
+      setPlaybackBuffer(decoded.audioBuffer);
       setWindows(analyzedWindows);
       setHoverIndex(null);
       setHoverX(0);
@@ -132,6 +138,7 @@ export default function App() {
       setHoverX(0);
       setTimelineCanvasWidth(1);
       setWindows([]);
+      setPlaybackBuffer(null);
       setStatus("error");
       setErrorMessage("We could not decode or analyze that track. Please try another file.");
     }
@@ -163,7 +170,9 @@ export default function App() {
         {windows.length === 0 ? (
           <p>Select audio file to analyze timeline</p>
         ) : (
-          <div className="timeline-shell">
+          <div className="viz-stack">
+            <CircularPlayback audioBuffer={playbackBuffer} />
+            <div className="timeline-shell">
             <p>{windows.length} windows analyzed</p>
             <canvas
               ref={canvasRef}
@@ -212,6 +221,7 @@ export default function App() {
             ) : (
               <p className="timeline-hint">Hover the timeline to inspect a window</p>
             )}
+            </div>
           </div>
         )}
       </section>
