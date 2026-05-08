@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { runAnalysisPipeline } from "./analysis/workerClient";
 import { decodeToMono } from "./audio/decode";
-import { CircularPlayback } from "./components/CircularPlayback";
+import { CircularPlayback, type PlaybackUpdatePayload } from "./components/CircularPlayback";
 import { confidencePillModifiers } from "./render/confidenceTier";
 import { getWindowIndexAtX, renderTimeline } from "./render/timelineCanvas";
 import type { TimelineWindow } from "./types/timeline";
@@ -62,22 +62,37 @@ export default function App() {
   const [hoverX, setHoverX] = useState(0);
   /** Canvas bitmap width matching element width; avoids magic numbers for tooltip positioning */
   const [timelineCanvasWidth, setTimelineCanvasWidth] = useState(1);
+  /** Playhead (seconds) from audio playback — drives which timeline windows are drawn. */
+  const [playbackHeadSec, setPlaybackHeadSec] = useState(0);
+  const [playbackHasStarted, setPlaybackHasStarted] = useState(false);
   const activeRequestRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const handlePlaybackUpdate = useCallback((payload: PlaybackUpdatePayload) => {
+    setPlaybackHeadSec(payload.headSec);
+    setPlaybackHasStarted(payload.hasEverStarted);
+  }, []);
+
+  const visibleWindows = useMemo(() => {
+    if (!playbackHasStarted) {
+      return [];
+    }
+    return windows.filter((w) => playbackHeadSec >= w.startSec);
+  }, [windows, playbackHasStarted, playbackHeadSec]);
 
   useEffect(() => {
     if (!canvasRef.current) {
       return;
     }
-    renderTimeline(canvasRef.current, windows, { hoverIndex });
-  }, [windows, hoverIndex]);
+    renderTimeline(canvasRef.current, visibleWindows, { hoverIndex });
+  }, [visibleWindows, hoverIndex]);
 
   useLayoutEffect(() => {
-    if (!canvasRef.current || windows.length === 0) {
+    if (!canvasRef.current || visibleWindows.length === 0) {
       return;
     }
     setTimelineCanvasWidth(canvasRef.current.width);
-  }, [windows]);
+  }, [visibleWindows]);
 
   async function handleFile(file: File): Promise<void> {
     const requestId = activeRequestRef.current + 1;
@@ -99,6 +114,8 @@ export default function App() {
 
     setWindows([]);
     setPlaybackBuffer(null);
+    setPlaybackHeadSec(0);
+    setPlaybackHasStarted(false);
     setHoverIndex(null);
     setHoverX(0);
     setTimelineCanvasWidth(1);
@@ -147,7 +164,7 @@ export default function App() {
   }
 
   const hoveredWindow =
-    hoverIndex !== null && windows[hoverIndex] ? windows[hoverIndex] : null;
+    hoverIndex !== null && visibleWindows[hoverIndex] ? visibleWindows[hoverIndex] : null;
   const tooltipLeftPercent =
     timelineCanvasWidth > 0 ? (hoverX / timelineCanvasWidth) * 100 : 0;
 
@@ -182,9 +199,21 @@ export default function App() {
           <p>Select audio file to analyze timeline</p>
         ) : (
           <div className="viz-stack">
-            <CircularPlayback audioBuffer={playbackBuffer} />
+            <CircularPlayback audioBuffer={playbackBuffer} onPlaybackUpdate={handlePlaybackUpdate} />
             <div className="timeline-shell">
-            <p>{windows.length} windows analyzed</p>
+            <p>
+              {windows.length} windows analyzed
+              {!playbackHasStarted ? (
+                <span className="timeline-shell__hint"> — press Play to reveal the timeline with playback</span>
+              ) : (
+                <span className="timeline-shell__hint">
+                  {" "}
+                  — showing {visibleWindows.length} / {windows.length} (
+                  {Math.min(playbackHeadSec, windows[windows.length - 1]?.endSec ?? 0).toFixed(0)}s /{" "}
+                  {(playbackBuffer?.duration ?? 0).toFixed(0)}s)
+                </span>
+              )}
+            </p>
             <canvas
               ref={canvasRef}
               width={TIMELINE_CANVAS_WIDTH}
@@ -196,7 +225,11 @@ export default function App() {
                 const scaleX = canvas.width / rect.width;
                 const x = (event.clientX - rect.left) * scaleX;
                 setHoverX(Math.max(0, Math.min(canvas.width, x)));
-                setHoverIndex(getWindowIndexAtX(x, canvas.width, windows.length));
+                if (visibleWindows.length === 0) {
+                  setHoverIndex(null);
+                  return;
+                }
+                setHoverIndex(getWindowIndexAtX(x, canvas.width, visibleWindows.length));
               }}
               onMouseLeave={() => {
                 setHoverIndex(null);
@@ -230,7 +263,11 @@ export default function App() {
                 </p>
               </div>
             ) : (
-              <p className="timeline-hint">Hover the timeline to inspect a window</p>
+              <p className="timeline-hint">
+                {playbackHasStarted
+                  ? "Hover the timeline to inspect a visible window"
+                  : "Press Play — energy, BPM, and key columns appear as playback reaches each segment"}
+              </p>
             )}
             </div>
           </div>

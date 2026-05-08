@@ -40,6 +40,11 @@ body {
   margin-top: 1rem;
 }
 
+.timeline-shell__hint {
+  font-weight: 400;
+  color: #94a3b8;
+}
+
 .timeline-shell canvas {
   display: block;
   width: 100%;
