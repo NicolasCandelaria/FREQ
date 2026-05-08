@@ -15,3 +15,43 @@ body {
   place-items: center;
   min-height: 100vh;
 }
+
+.timeline-shell {
+  width: min(1200px, 92vw);
+  margin-top: 1rem;
+}
+
+.timeline-shell canvas {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #1d2030;
+  border-radius: 8px;
+  background: #09090f;
+}
+
+.timeline-tooltip {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #1d2030;
+  background: rgba(14, 17, 30, 0.9);
+}
+
+.timeline-tooltip p {
+  margin: 0.15rem 0;
+}
+
+.timeline-hint {
+  margin-top: 0.75rem;
+  color: #a4aec3;
+}
+
+.high-confidence {
+  color: #8be9fd;
+}
+
+.low-confidence {
+  color: #f6ad55;
+}

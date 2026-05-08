@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { runAnalysisPipeline } from "./analysis/workerClient";
 import { decodeToMono } from "./audio/decode";
-import { renderTimeline } from "./render/timelineCanvas";
+import { getWindowIndexAtX, renderTimeline } from "./render/timelineCanvas";
 import type { TimelineWindow } from "./types/timeline";
 
 type UploadStatus = "idle" | "decoding" | "analyzing" | "rendered" | "error";
@@ -49,6 +49,7 @@ export default function App() {
   const [status, setStatus] = useState<UploadStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [windows, setWindows] = useState<TimelineWindow[]>([]);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const activeRequestRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -56,8 +57,8 @@ export default function App() {
     if (!canvasRef.current) {
       return;
     }
-    renderTimeline(canvasRef.current, windows);
-  }, [windows]);
+    renderTimeline(canvasRef.current, windows, { hoverIndex });
+  }, [windows, hoverIndex]);
 
   async function handleFile(file: File): Promise<void> {
     const requestId = activeRequestRef.current + 1;
@@ -67,6 +68,7 @@ export default function App() {
       if (activeRequestRef.current !== requestId) {
         return;
       }
+      setHoverIndex(null);
       setWindows([]);
       setStatus("error");
       setErrorMessage("Please upload one .mp3, .wav, or .m4a file.");
@@ -74,6 +76,7 @@ export default function App() {
     }
 
     setWindows([]);
+    setHoverIndex(null);
     setErrorMessage(null);
     setStatus("decoding");
 
@@ -93,11 +96,20 @@ export default function App() {
       if (activeRequestRef.current !== requestId) {
         return;
       }
+      setHoverIndex(null);
       setWindows([]);
       setStatus("error");
       setErrorMessage("We could not decode or analyze that track. Please try another file.");
     }
   }
+
+  const hoveredWindow =
+    hoverIndex !== null && windows[hoverIndex] ? windows[hoverIndex] : null;
+
+  const bpmConfidenceClass =
+    hoveredWindow && hoveredWindow.bpmConfidence < 0.5 ? "low-confidence" : "high-confidence";
+  const keyConfidenceClass =
+    hoveredWindow && hoveredWindow.keyConfidence < 0.5 ? "low-confidence" : "high-confidence";
 
   return (
     <main className="app">
@@ -120,10 +132,44 @@ export default function App() {
         {windows.length === 0 ? (
           <p>Drop audio file to analyze timeline</p>
         ) : (
-          <>
+          <div className="timeline-shell">
             <p>{windows.length} windows analyzed</p>
-            <canvas ref={canvasRef} width={1200} height={420} />
-          </>
+            <canvas
+              ref={canvasRef}
+              width={1200}
+              height={420}
+              onMouseMove={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                setHoverIndex(getWindowIndexAtX(x, event.currentTarget.width, windows.length));
+              }}
+              onMouseLeave={() => {
+                setHoverIndex(null);
+              }}
+            />
+            {hoveredWindow ? (
+              <div className="timeline-tooltip" role="status" aria-live="polite">
+                <p>
+                  <strong>Window:</strong> {hoveredWindow.startSec.toFixed(0)}s -{" "}
+                  {hoveredWindow.endSec.toFixed(0)}s
+                </p>
+                <p>
+                  <strong>Energy:</strong> {hoveredWindow.energyRms.toFixed(3)}
+                </p>
+                <p className={bpmConfidenceClass}>
+                  <strong>BPM:</strong>{" "}
+                  {hoveredWindow.bpm === null ? "N/A" : hoveredWindow.bpm.toFixed(1)} (
+                  {(hoveredWindow.bpmConfidence * 100).toFixed(0)}% confidence)
+                </p>
+                <p className={keyConfidenceClass}>
+                  <strong>Key:</strong> {hoveredWindow.key ?? "Unknown"} (
+                  {(hoveredWindow.keyConfidence * 100).toFixed(0)}% confidence)
+                </p>
+              </div>
+            ) : (
+              <p className="timeline-hint">Hover the timeline to inspect a window</p>
+            )}
+          </div>
         )}
       </section>
     </main>
